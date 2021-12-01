@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# S2I assemble script for the 's2i-maven-java' image.
+# The 'assemble' script builds your application source so that it is ready to run.
+#
+# For more information refer to the documentation:
+#	https://github.com/openshift/source-to-image/blob/master/docs/builder_image.md
+#
+
+set -e
+shopt -u dotglob
+DOCROOT="/home/app"
+
+
+
+if [[ "$1" == "-h" ]]; then
+	exec /usr/libexec/s2i/usage
+fi
+
+
+  if [ -d /tmp/artifacts/vendor ]; then
+  echo "---> RESTORING VENDOR FROM CACHE..."
+  cp -rf /tmp/artifacts/vendor $DOCROOT/vendor
+  rm -rf /tmp/artifacts
+
+fi
+
+echo "---> INSTALL SOURCE CODE..."
+cp -rf /tmp/src/.  $DOCROOT/
+rm -rf /tmp/src
+
+if [[ ! -z $BUNDLE_COMMAND ]]; then
+echo "---> BUNDLE_COMMAND FOUND!..."
+echo "---> EXEC $BUNDLE_COMMAND"
+eval $BUNDLE_COMMAND
+else
+echo "---> EXEC DEFAULT BUNDLE INSTALL COMMAND..."
+echo "---> bundle install --verbose --without development test $BUNDLE_ARGS"
+bundle install --verbose --without development test $BUNDLE_ARGS
+fi
+
+#######################################
+echo "START FIX PERMISSIONS..."
+/usr/libexec/s2i/fix $DOCROOT
+echo "FIX PERMISSIONS END"
+echo "----> INSTALL FINISH"

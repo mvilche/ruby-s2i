@@ -1,0 +1,47 @@
+FROM centos:8
+
+ENV RUBY_VERSION=3.0.3 \
+RBENV_INSTALLER=https://raw.githubusercontent.com/rbenv/rbenv-installer/main/bin/rbenv-installer \
+EPEL=https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm \
+LANG=es_ES.UTF-8 \
+LANGUAGE=es_ES.UTF-8 \
+LC_COLLATE=C \
+LC_CTYPE=es_ES.UTF-8 \
+HOME=/home/app \
+PATH=$PATH:/home/app/.rbenv/bin:/home/app/.rbenv/versions/$RUBY_VERSION/bin
+
+
+LABEL autor="Martin Vilche <mfvilche@gmail.com>" \
+      io.k8s.description="ruby s2i images" \
+      io.k8s.display-name="ruby Applications" \
+      io.openshift.tags="builder,ruby,centos" \
+      io.openshift.expose-services="8080" \
+      io.openshift.s2i.scripts-url="image:///usr/libexec/s2i"
+      
+
+RUN echo "LANG=$LANG" > /etc/locale.conf && \
+dnf --nodocs install glibc-langpack-en glibc-langpack-es -y && dnf --nodocs update -y && dnf --nodocs install $EPEL dnf-utils -y && \
+dnf --nodocs install git wget gcc bzip2 make autoconf automake openssl-devel libffi-devel readline-devel zlib-devel gdbm-devel ncurses-devel mysql-devel postgresql-devel -y
+
+COPY s2i/bin/ /usr/libexec/s2i
+
+RUN adduser -u 1001 -m app && usermod -aG 0 app && echo 'eval "$(rbenv init -)"' >> $HOME/.bashrc && \
+wget -q $RBENV_INSTALLER -O- | bash && \ 
+rm -rf /etc/localtime && touch /etc/localtime /etc/timezone && \
+chown  -R 1001 /home/app  /etc/timezone /etc/localtime /usr/libexec/s2i && \
+chgrp -R 0 /home/app  /etc/timezone /etc/localtime /usr/libexec/s2i && \
+chmod -R g=u /home/app  /etc/timezone /etc/localtime /usr/libexec/s2i && \
+chmod +x /usr/libexec/s2i/* && \
+dnf autoremove -y &> /dev/null && dnf clean all &> /dev/null && rm -rf /var/cache/dnf &> /dev/null
+
+WORKDIR /home/app/
+
+USER 1001:0
+
+ENV PATH=$PATH:/home/app/.rbenv/bin:/home/app/.rbenv/versions/$RUBY_VERSION/bin
+
+RUN rbenv install $RUBY_VERSION && rbenv global && gem install bundler
+
+EXPOSE 8080
+
+CMD ["/usr/libexec/s2i/run"]
